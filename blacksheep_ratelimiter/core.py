@@ -72,7 +72,8 @@ class RatelimitingMiddleware:
                         'tries': data['tries'] - 1,
                         'expires_at': data['expires_at'],
                     }
-                )
+                ),
+                ex=self._expire_at
             )
 
             resp: Response = await handler(request)
