@@ -3,7 +3,7 @@ import time
 from typing import TYPE_CHECKING, Coroutine
 
 import orjson
-from blacksheep import Request
+from blacksheep import Request, Response
 from .utils import jsonify
 
 if TYPE_CHECKING:
@@ -28,14 +28,23 @@ class RatelimitingMiddleware:
         d = await self._redis.get(uid)
 
         if d is None:
+            data = orjson.dumps({
+                'tries': self._max_tries - 1,
+                'expires_at': time.time() + self._expire_at
+            })
             await self._redis.set(
                 uid,
-                orjson.dumps({
-                    'tries': self._max_tries - 1,
-                    'expires_at': time.time() + self._expire_at
-                }),
+                data,
                 ex=self._expire_at
             )
+
+            resp = await handler(request)
+            resp.add_header(b'X-RateLimit-Reset-At', str(data['expires_at']).encode())
+            resp.add_header(b'X-RateLimit-Reset-After', str(data['expires_at'] - time.time()).encode())
+            resp.add_header(b'X-RateLimit-Bucket', uid.encode())
+            resp.add_header(b'X-RateLimit-Remaining', str(data['tries']).encode())
+            resp.add_header(b'X-RateLimit-Limit', str(self._max_tries).encode())
+            return resp
         else:
             data = orjson.loads(d)
 
@@ -48,6 +57,11 @@ class RatelimitingMiddleware:
                     },
                     status=429
                 )
+                resp.add_header(b'X-RateLimit-Reset-At', str(data['expires_at']).encode())
+                resp.add_header(b'X-RateLimit-Reset-After', str(data['expires_at'] - time.time()).encode())
+                resp.add_header(b'X-RateLimit-Bucket', uid.encode())
+                resp.add_header(b'X-RateLimit-Remaining', str(data['tries']).encode())
+                resp.add_header(b'X-RateLimit-Limit', str(self._max_tries).encode())
                 return resp
 
             await self._redis.delete(uid)
@@ -56,11 +70,16 @@ class RatelimitingMiddleware:
                 orjson.dumps(
                     {
                         'tries': data['tries'] - 1,
-                        'expires_at': data['expires_at']
+                        'expires_at': data['expires_at'],
                     }
                 )
             )
 
-            resp = await handler()
+            resp: Response = await handler(request)
+            resp.add_header(b'X-RateLimit-Reset-At', str(data['expires_at']).encode())
+            resp.add_header(b'X-RateLimit-Reset-After', str(data['expires_at'] - time.time()).encode())
+            resp.add_header(b'X-RateLimit-Bucket', uid.encode())
+            resp.add_header(b'X-RateLimit-Remaining', str(data['tries']).encode())
+            resp.add_header(b'X-RateLimit-Limit', str(self._max_tries).encode())
 
             return resp

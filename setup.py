@@ -7,7 +7,7 @@ setup(
     name='Blacksheep-RateLimiter',
     author='Concord',
     url='https://github.com/concordchat/Blacksheep-RateLimiter',
-    version='1.0.0',
+    version='1.0.2',
     packages=['blacksheep_ratelimiter'],
     license='MIT',
     description='RateLimit Middleware for Blacksheep',
