@@ -57,6 +57,7 @@ class RatelimitingMiddleware:
                     },
                     status=429
                 )
+                print(data)
                 resp.add_header(b'X-RateLimit-Reset-At', str(data['expires_at']).encode())
                 resp.add_header(b'X-RateLimit-Reset-After', str(data['expires_at'] - time.time()).encode())
                 resp.add_header(b'X-RateLimit-Bucket', uid.encode())
