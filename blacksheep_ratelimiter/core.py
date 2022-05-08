@@ -13,17 +13,17 @@ if TYPE_CHECKING:
 class RatelimitingMiddleware:
     def __init__(
         self,
-        redis: Redis,
+        redis: "Redis",
         expires: int = 1,
         max_tries: int = 50,
     ):
-        self._redis = redis
+        self._redis: "Redis" = redis
         self._expire_at = expires
         self._max_tries = max_tries
 
     async def __call__(self, request: Request, handler: Coroutine):
         ip = request.client_ip
-        uid = hashlib.md5(ip, usedforsecurity=True).hexdigest()
+        uid = hashlib.md5(ip.encode(), usedforsecurity=True).hexdigest()
 
         d = await self._redis.get(uid)
 
